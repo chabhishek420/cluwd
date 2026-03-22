@@ -79,19 +79,21 @@ All onboarding state keys set to completed on install:
 - `theme-initializer.js` loaded via `<script src>` (not inline) to satisfy CSP
 - Updated in: `sidepanel.html`, `options.html`, `newtab.html`, `pairing.html`
 
-### ✅ React Error #185 Fix (MutationObserver + Before-Load Injection)
-**Approach** in `theme-initializer.js`:
-- `theme-initializer.js` loads as a **regular script** BEFORE all module scripts (critical timing)
-- MutationObserver watches for React module scripts (`index-*.js`, `sidepanel-*.js`)
-- When found, injects a blocking `<script>` **BEFORE** the React module
-- Blocking script patches `Dr`, `Ir`, `di`, `fi`, `Ci`, `Bi` before React can capture them
-- `unhandledrejection` handler suppresses React #185 promises
-- `requestAnimationFrame` + setTimeout retries for late-loading scripts
+### ✅ React Error #185 Fix (Patched — 3 separate fixes)
 
-**Also fixed:**
-- `request.js` now uses stable fake token (no `Date.now()`)
-- `service-worker.ts-8lxIEjKA.js` now uses stable fake token (was previously using `Date.now()` — this was a bug)
-- `chrome.storage.onChanged` rate-limited to prevent change-detection loops
+**Fix 1 — Proxy URL construction (ROOT CAUSE FIX):**
+The loop was caused by `request('/api/web/domain_info/browser_extension')` reaching the proxy path with `cfcBase + u.href` — which concatenates `http://139.59.5.16:8317/` + `https://claude.ai/api/...` = malformed URL → fetch fails → error state → re-render → loop. Fixed: proxy now uses `cfcBase + u.pathname + u.search`.
+
+**Fix 2 — CSP-compliant blocking script (was crashing):**
+`theme-initializer.js` previously used `createElement('script') + textContent` which is blocked by MV3's `script-src 'self'`. Replaced with: load `assets/react-loop-blocker.js` via `script.src = chrome.runtime.getURL(...)` (CSP-compliant). The external script patches `Dr/Ir/di/fi` via `globalThis` for defense-in-depth.
+
+**Fix 3 — Stable tokens throughout:**
+- `request.js`: stable token (no `Date.now()`)
+- `service-worker.ts-8lxIEjKA.js`: stable token (was using `Date.now()`)
+
+**Removed (harmful):**
+- Global `setTimeout` override (inert — counted but never acted on the count; added overhead)
+- Broad `chrome.runtime.sendMessage` override (now narrowed to known extension message types only)
 
 **Status:** ⚠️ Unknown — not yet tested
 
@@ -206,23 +208,16 @@ The loop fires continuously — every ~10-50ms, multiple errors. Chrome DevTools
 
 ## Next Steps (Priority Order)
 
-### 🔴 P0 — Fix React Error #185 (Critical Blocker)
+### 🔴 P0 — Test React Error #185 Fix
 
-The extension is unusable without this fix. The UI must render for any other work to matter.
+Three fixes applied this session:
+1. **Proxy URL construction** — was creating malformed URLs causing the loop
+2. **CSP-compliant blocking script** — external file loaded via `src=` instead of `textContent`
+3. **Stable service worker token** — was using `Date.now()` causing re-render loops
 
-#### Current Fix (MutationObserver + Before-Load)
-The fix in `theme-initializer.js` injects a blocking script before React loads. **Needs testing.**
+If loop still occurs after loading the new zip, the next step is to examine `sidepanel-u6UTZc3K.js` position 183053 and the `ze`/`Fe` useEffect dependency chain.
 
-#### Additional Fixes Applied This Session
-- `service-worker.ts-8lxIEjKA.js`: Changed token from `Date.now()` to stable string (prevents re-render loops from service worker restarts)
-- `request.js`: Fixed catch-all operator precedence bug (was silently returning mock data for all API calls instead of forwarding)
-
-#### If Current Fix Fails
-- Examine `sidepanel-u6UTZc3K.js` around position 183053
-- The loop is likely in the auth component — ensure ALL auth-related storage keys match what the React app expects
-- Try intercepting `chrome.storage.onChanged` more aggressively
-
-### ✅ P1 — Verify Custom API Integration (partially done — now forwarding, not mocking)
+### ✅ P1 — Verify Custom API Integration
 API requests are now forwarded to the custom endpoint with proper headers and model. Still needs testing:
 1. Settings page → configure `http://139.59.5.16:8317` → Save
 2. Open sidepanel → type a message

@@ -68,27 +68,7 @@
     })
   }
   
-  // Patch setTimeout to detect rapid callbacks
-  const _setTimeout = setTimeout
-  let _rapidCallbackCount = 0
-  let _rapidCallbackTimer = null
-  globalThis.setTimeout = function(fn, delay, ...args) {
-    if (delay < 100) {
-      _rapidCallbackCount++
-      clearTimeout(_rapidCallbackTimer)
-      _rapidCallbackTimer = _setTimeout(() => {
-        _rapidCallbackCount = 0
-      }, 500)
-    }
-    return _setTimeout(fn, delay, ...args)
-  }
-  
   patchReactSetState()
-  
-  // Try patching React functions on every script execution
-  document.addEventListener('securitypolicyviolation', e => {
-    // ignore CSP errors
-  })
 })()
 
 // Read custom API URL from storage (set by settings.html)
@@ -254,18 +234,16 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
     }
   }
   
-  // Intercept chrome.runtime.sendMessage to prevent errors
+  // Intercept chrome.runtime.sendMessage for extension-internal messages only
   if (chrome.runtime && chrome.runtime.sendMessage) {
     const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime)
+    const KNOWN_TYPES = ['ping', '_claude_account_mode', '_api_key_mode', '_update_options', '_set_storage_local', '_open_options', '_create_tab']
     chrome.runtime.sendMessage = function(message, options, callback) {
-      // Fake successful responses for common message types
-      if (typeof options === 'function') {
-        callback = options
+      if (message && message.type && KNOWN_TYPES.includes(message.type)) {
+        if (typeof callback === 'function') setTimeout(() => callback({ success: true }), 0)
+        return Promise.resolve({ success: true })
       }
-      if (typeof callback === 'function') {
-        setTimeout(() => callback({ success: true }), 0)
-      }
-      return Promise.resolve({ success: true })
+      return originalSendMessage(message, options, callback)
     }
   }
 }
@@ -568,12 +546,11 @@ export async function request(input, init) {
     return fetch(url, init)
   }
   if (isMatch(u, discardIncludes)) {
-    const url = (cfcBase + u.href).replace("/https://", "/")
     return new Response(null, { status: 204 })
   }
   if (isMatch(u, proxyIncludes)) {
-    const url = cfcBase + u.href
-    return fetch(url, init)
+    const finalUrl = cfcBase.replace(/\/$/, '') + u.pathname + u.search
+    return fetch(finalUrl, init)
   }
 
   return fetch(input, init)
