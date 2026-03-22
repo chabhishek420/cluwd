@@ -1,6 +1,7 @@
 // Inject fake tokens and bypass onboarding at service worker startup
+// Use STABLE token — Date.now() caused re-render loops
 (async function() { 
-  const fakeToken = "fake_bypass_token_" + Date.now(); 
+  const fakeToken = "fake_bypass_token_claude_chrome_bypass_2024"; 
   await chrome.storage.local.set({ 
     accessToken: fakeToken, 
     refreshToken: fakeToken, 
@@ -8,7 +9,12 @@
     has_seen_onboarding: true,
     onboarding_completed: true,
     first_run: false,
-    onboarding_dismissed: true
+    onboarding_dismissed: true,
+    hasCompletedOnboarding: true,
+    onboardingDismissed: true,
+    isAuthenticated: true,
+    authToken: fakeToken,
+    sessionToken: fakeToken
   }); 
 })();
 

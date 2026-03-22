@@ -115,6 +115,23 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
 }
 
 var cfcBase = getCfcBase();
+var _cachedApiKey = null;
+var _cachedModel = null;
+
+function getCached(key, fallback) {
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    chrome.storage.local.get([key], function(result) {
+      if (result[key]) {
+        if (key === 'customApiBaseUrl') _cachedCfcBase = result[key].replace(/\/$/, '') + '/';
+        if (key === 'customApiKey') _cachedApiKey = result[key];
+        if (key === 'customModel') _cachedModel = result[key];
+      }
+    });
+  }
+  return fallback;
+}
+getCached('customApiKey', '');
+getCached('customModel', 'claude-3-sonnet-20240229');
 
 // Inject comprehensive fake state to bypass authentication and onboarding
 // Use a STABLE fake token (don't use Date.now() - causes re-renders!)
@@ -421,248 +438,101 @@ export async function request(input, init) {
                     u.host.includes('claude')
 
   if (isApiCall) {
-    // Intercept OAuth profile requests and return a valid profile
-    if (u.pathname.includes('/api/oauth/profile')) {
-      return new Response(JSON.stringify({
-        account: {
-          uuid: "fake-user-uuid",
-          email: "user@custom-api.local",
-          has_claude_max: true,
-          has_claude_pro: true
-        },
-        organization: {
-          uuid: "fake-org-uuid",
-          organization_type: "pro"
-        }
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const isAuthEndpoint =
+      u.pathname.includes('/api/oauth/profile') ||
+      u.pathname.includes('/api/bootstrap') ||
+      u.pathname.includes('/api/oauth/account') ||
+      u.pathname.includes('/api/oauth/organizations') ||
+      u.pathname.includes('/api/oauth/chat_conversations') ||
+      u.pathname.includes('/oauth/token');
 
-    // Intercept bootstrap requests and return valid features
-    if (u.pathname.includes('/api/bootstrap')) {
-      return new Response(JSON.stringify({
-        features: {
-          "claude_in_chrome": { on: true, value: { enabled: true } },
-          "browser_extension_v2": { on: true, value: true },
-          "new_chat_ui": { on: true, value: true },
-          "enhanced_onboarding": { on: false, value: false },
-          "claude_max_integration": { on: true, value: { enabled: true, tier: "pro" } }
-        }
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Intercept account, organizations, conversations endpoints
-    if (u.pathname.includes('/api/oauth/account') || u.pathname.includes('/api/oauth/organizations') || u.pathname.includes('/api/oauth/chat_conversations') || u.pathname.includes('/conversations')) {
-      return new Response(JSON.stringify({
-        account: { uuid: "fake-user-uuid", email: "user@custom-api.local", has_claude_max: true, has_claude_pro: true },
-        organization: { uuid: "fake-org-uuid", organization_type: "pro" }
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Intercept token refresh requests
-    if (u.pathname.includes('/oauth/token')) {
-      return new Response(JSON.stringify({
-        access_token: "fake_access_token_" + Date.now(),
-        refresh_token: "fake_refresh_token_" + Date.now(),
-        expires_in: 86400,
-        token_type: "Bearer"
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Intercept v1/messages endpoint - RETURN STREAMING SSE FORMAT
-    if (u.pathname.includes('/v1/messages') && init?.method === 'POST') {
-      const messageId = "msg_" + Date.now()
-      const messageText = "Hello! This is a test response from the Claude Chrome extension bypass. Your custom API is working!"
-      const streamData = [
-        `event: message_start\ndata: {"type":"message_start","message":{"id":"${messageId}","type":"message","role":"assistant","content":[],"model":"claude-3-sonnet-20240229","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}},"usage":{"input_tokens":5}}\n\n`,
-        `event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n`,
-        `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"${messageText}"}}\n\n`,
-        `event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n`,
-        `event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":25}}\n\n`,
-        `event: message_stop\ndata: {"type":"message_stop"}\n\n`
-      ]
-      return new Response(streamData.join(''), {
-        status: 200,
-        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" }
-      })
-    }
-
-    // Intercept v1/models endpoint
-    if (u.pathname.includes('/v1/models')) {
-      return new Response(JSON.stringify({
-        data: [{ id: "claude-3-sonnet-20240229", object: "model", created: 1700000000, owned_by: "anthropic", permission: [], root: "claude-3-sonnet-20240229", parent: null }],
-        object: "list"
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Intercept v1/chat/completions endpoint (OpenAI compatible)
-    if (u.pathname.includes('/v1/chat/completions') && init?.method === 'POST') {
-      return new Response(JSON.stringify({
-        id: "chatcmpl_" + Date.now(),
-        object: "chat.completion",
-        created: Math.floor(Date.now() / 1000),
-        model: "claude-3-sonnet-20240229",
-        choices: [{ index: 0, message: { role: "assistant", content: "This is a bypass response. Your custom API is working!" }, finish_reason: "stop" }],
-        usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 }
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Intercept conversation list endpoint
-    if (u.pathname.includes('/conversations') || u.pathname.includes('/v1/conversations')) {
-      return new Response(JSON.stringify({
-        conversations: [],
-        has_more: false,
-        total: 0
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Intercept sessions endpoint
-    if (u.pathname.includes('/sessions') || u.pathname.includes('/v1/sessions')) {
-      return new Response(JSON.stringify({
-        sessions: [],
-        has_more: false
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Intercept count_tokens endpoint
-    if (u.pathname.includes('/count_tokens') || u.pathname.includes('/v1/count_tokens')) {
-      return new Response(JSON.stringify({
-        count: 0,
-        tokens: 0
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Intercept any other API call and return appropriate response
-    if (u.pathname.startsWith('/api/') || u.pathname.startsWith('/v1/') || u.pathname.includes('messages') || u.pathname.includes('models') || u.pathname.includes('conversations')) {
-      // User/profile endpoints
-      if (u.pathname.includes('user') || u.pathname.includes('profile') || u.pathname.includes('account')) {
+    if (isAuthEndpoint) {
+      if (u.pathname.includes('/api/oauth/profile') || u.pathname.includes('/api/oauth/account') || u.pathname.includes('/api/oauth/organizations') || u.pathname.includes('/api/oauth/chat_conversations')) {
         return new Response(JSON.stringify({
-          uuid: "fake-user-uuid",
-          email: "user@custom-api.local",
-          name: "Test User",
-          has_claude_max: true,
-          has_claude_pro: true,
-          organization: {
-            uuid: "fake-org-uuid",
-            name: "Test Organization",
-            organization_type: "pro"
+          account: { uuid: "fake-user-uuid", email: "user@custom-api.local", has_claude_max: true, has_claude_pro: true },
+          organization: { uuid: "fake-org-uuid", organization_type: "pro" }
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (u.pathname.includes('/api/bootstrap')) {
+        return new Response(JSON.stringify({
+          features: {
+            "claude_in_chrome": { on: true, value: { enabled: true } },
+            "browser_extension_v2": { on: true, value: true },
+            "new_chat_ui": { on: true, value: true },
+            "enhanced_onboarding": { on: false, value: false },
+            "claude_max_integration": { on: true, value: { enabled: true, tier: "pro" } }
           }
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
-      // Settings/preferences endpoints
-      if (u.pathname.includes('settings') || u.pathname.includes('preferences') || u.pathname.includes('config')) {
+      if (u.pathname.includes('/oauth/token')) {
         return new Response(JSON.stringify({
-          theme: "dark",
-          language: "en-US",
-          notifications: true,
-          model: "claude-3-sonnet-20240229"
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
+          access_token: fakeToken,
+          refresh_token: fakeToken,
+          expires_in: 86400,
+          token_type: "Bearer"
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
-      // Messages endpoint - return streaming response
-      if (u.pathname.includes('messages') && init?.method === 'POST') {
-        const messageId = "msg_" + Date.now()
-        const messageText = "Hello! This is a test response from the Claude Chrome extension bypass. Your custom API is working!"
-        const streamData = [
-          `event: message_start\ndata: {"type":"message_start","message":{"id":"${messageId}","type":"message","role":"assistant","content":[],"model":"claude-3-sonnet-20240229","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}},"usage":{"input_tokens":5}}\n\n`,
-          `event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n`,
-          `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"${messageText}"}}\n\n`,
-          `event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n`,
-          `event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":25}}\n\n`,
-          `event: message_stop\ndata: {"type":"message_stop"}\n\n`
-        ]
-        return new Response(streamData.join(''), {
-          status: 200,
-          headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" }
-        })
-      }
-      // Models endpoint
-      if (u.pathname.includes('models')) {
-        return new Response(JSON.stringify({
-          data: [{ id: "claude-3-sonnet-20240229", object: "model", created: 1700000000, owned_by: "anthropic", permission: [], root: "claude-3-sonnet-20240229", parent: null }],
-          object: "list"
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-      // Conversations endpoint
-      if (u.pathname.includes('conversations')) {
-        return new Response(JSON.stringify({
-          conversations: [],
-          has_more: false,
-          total: 0
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-      // Default success response
-  return new Response(JSON.stringify({ success: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" }
-  });
-}
+    }
 
-// Prevent infinite render loops by providing stable mock data
-const mockApiState = {
-  conversations: [],
-  sessions: [],
-  models: {
-    data: [{ id: "claude-3-sonnet-20240229", object: "model", created: 1700000000, owned_by: "anthropic" }]
-  }
-}
+    const isRealApiEndpoint =
+      u.pathname.includes('/v1/messages') ||
+      u.pathname.includes('/v1/models') ||
+      u.pathname.includes('/v1/chat/completions') ||
+      u.pathname.includes('/v1/conversations') ||
+      u.pathname.includes('/v1/sessions') ||
+      u.pathname.includes('/v1/embeddings') ||
+      u.pathname.includes('/count_tokens');
 
-globalThis.__mockApiState = mockApiState
+    if (isRealApiEndpoint) {
+      const apiBase = _cachedCfcBase || cfcBase;
+      const model = _cachedModel || 'claude-3-sonnet-20240229';
+      let finalUrl = apiBase + u.pathname + u.search;
 
-    // Let other custom API calls through to actual server
+      let body = init?.body;
+      if (body && typeof body === 'string') {
+        try {
+          body = JSON.parse(body);
+          body.model = body.model || model;
+          body = JSON.stringify(body);
+        } catch(e) {}
+      }
+
+      const headers = new Headers(init?.headers || {});
+      if (_cachedApiKey) {
+        headers.set('Authorization', 'Bearer ' + _cachedApiKey);
+      }
+      headers.set('anthropic-version', '2023-06-01');
+
+      console.log('[request.js] Forwarding to custom API:', finalUrl);
+      return fetch(finalUrl, {
+        ...init,
+        method: init?.method || 'GET',
+        headers: headers,
+        body: body
+      });
+    }
+
+    if (u.pathname.includes('/conversations') || u.pathname.includes('/sessions')) {
+      const apiBase = _cachedCfcBase || cfcBase;
+      let finalUrl = apiBase.replace('/v1/', '/') + u.pathname + u.search;
+      const headers = new Headers(init?.headers || {});
+      if (_cachedApiKey) headers.set('Authorization', 'Bearer ' + _cachedApiKey);
+      console.log('[request.js] Forwarding to custom API:', finalUrl);
+      return fetch(finalUrl, { ...init, headers: headers });
+    }
   }
 
-  // Catch-all for any unmatched API calls - return valid response
-  const catchAllPatterns = ['/api/', '/v1/', '/oauth/', '/chat/', '/auth/', '/user/', '/account/']
+  // Catch-all for unmatched API calls from claude/anthropic hosts (forward to custom API)
+  const catchAllPatterns = ['/api/', '/oauth/', '/chat/', '/auth/', '/user/', '/account/']
   const isCatchAll = catchAllPatterns.some(p => u.pathname.includes(p))
   
-  if (isCatchAll && u.host.includes('claude') || u.host.includes('anthropic')) {
-    console.log('[request.js] Catch-all intercept for:', u.href)
-    return new Response(JSON.stringify({
-      success: true,
-      data: {},
-      message: "Intercepted by custom API bypass"
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    })
+  if (isCatchAll && (u.host.includes('claude') || u.host.includes('anthropic'))) {
+    const apiBase = _cachedCfcBase || cfcBase;
+    const headers = new Headers(init?.headers || {});
+    if (_cachedApiKey) headers.set('Authorization', 'Bearer ' + _cachedApiKey);
+    const finalUrl = apiBase + u.pathname + u.search;
+    console.log('[request.js] Forwarding unmatched API to custom API:', finalUrl);
+    return fetch(finalUrl, { ...init, headers: headers });
   }
 
   try {
@@ -805,7 +675,7 @@ if (globalThis.window) {
     const { ui } = globalThis.__cfc_options
     const pageUi = ui[location.pathname]
     if (pageUi) {
-      Object.values(optionsUi).forEach((item) => {
+      Object.values(pageUi).forEach((item) => {
         const el = document.querySelector(item.selector)
         if (el) el.innerHTML = item.html
       })
