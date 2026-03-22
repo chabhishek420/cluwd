@@ -1,0 +1,8 @@
+{
+  "name": {
+    "message": "claude chrome cowork: claude 4.6, glm 4.7, kimi k2, qwen 21"
+  },
+  "description": {
+    "message": "Browser-using AI Agent! Compatible with Arc and third-party API Key. More features, fewer limitations, unofficial, community-built."
+  }
+}
