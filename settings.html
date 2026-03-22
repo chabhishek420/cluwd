@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/icon-128.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claude Settings</title>
+  <style>
+    :root {
+      --bg-primary: #0f0f0f;
+      --bg-secondary: #1a1a1a;
+      --bg-tertiary: #252525;
+      --border: #333;
+      --text-primary: #e5e5e5;
+      --text-secondary: #999;
+      --accent: #7c5cff;
+      --accent-hover: #9b7fff;
+      --success: #22c55e;
+      --error: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      padding: 32px;
+    }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+    .hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    input[type="text"], input[type="url"], textarea {
+      width: 100%;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    button {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--border); }
+    .msg {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+    .msg.show { display: block; }
+    .msg.success { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+    .msg.error { background: rgba(239,68,68,0.15); color: var(--error); border: 1px solid rgba(239,68,68,0.3); }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 20px 0;
+    }
+    .link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .link-btn:hover { color: var(--accent-hover); text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Claude Extension Settings</h1>
+    <p class="subtitle">Configure your custom API endpoint and model preferences</p>
+
+    <div class="status">
+      <div class="status-dot"></div>
+      Extension running — bypass mode active
+    </div>
+
+    <div class="section">
+      <div class="section-title">Custom API Endpoint</div>
+      <div class="field">
+        <label for="apiBaseUrl">API Base URL</label>
+        <input type="url" id="apiBaseUrl" placeholder="http://139.59.5.16:8317" value="" />
+        <div class="hint">The base URL for your custom Claude-compatible API</div>
+      </div>
+      <div class="field">
+        <label for="apiKey">API Key (optional)</label>
+        <input type="text" id="apiKey" placeholder="sk-..." value="" />
+        <div class="hint">API key for authentication with your custom endpoint</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Model Configuration</div>
+      <div class="field">
+        <label for="defaultModel">Default Model</label>
+        <input type="text" id="defaultModel" placeholder="claude-3-sonnet-20240229" value="" />
+        <div class="hint">Model to use by default for chat completions</div>
+      </div>
+      <div class="field">
+        <label for="customModels">Available Models</label>
+        <textarea id="customModels" placeholder="claude-3-sonnet-20240229&#10;claude-3-opus-20240229&#10;claude-3-haiku-20240229"></textarea>
+        <div class="hint">One model ID per line. These will be available in the model selector.</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Storage</div>
+      <div class="field">
+        <div id="storageInfo" style="font-size:13px;color:var(--text-secondary)">Loading storage info...</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="saveBtn">Save Settings</button>
+      <button class="btn-secondary" id="resetBtn">Reset to Defaults</button>
+    </div>
+    <div id="saveMsg" class="msg"></div>
+
+    <hr class="divider" />
+
+    <button class="link-btn" id="openSidepanel">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      Open Claude Sidepanel
+    </button>
+  </div>
+
+  <script>
+    var DEFAULTS = {
+      customApiBaseUrl: 'http://139.59.5.16:8317',
+      customApiKey: '',
+      customModel: 'claude-3-sonnet-20240229',
+      customModels: ['claude-3-sonnet-20240229', 'claude-3-opus-20240229', 'claude-3-haiku-20240229']
+    };
+
+    var apiBaseUrl = document.getElementById('apiBaseUrl');
+    var apiKey = document.getElementById('apiKey');
+    var defaultModel = document.getElementById('defaultModel');
+    var customModels = document.getElementById('customModels');
+    var saveBtn = document.getElementById('saveBtn');
+    var resetBtn = document.getElementById('resetBtn');
+    var saveMsg = document.getElementById('saveMsg');
+    var storageInfo = document.getElementById('storageInfo');
+    var openSidepanel = document.getElementById('openSidepanel');
+
+    function showMsg(text, type) {
+      saveMsg.textContent = text;
+      saveMsg.className = 'msg show ' + type;
+      setTimeout(function() { saveMsg.className = 'msg'; }, 3000);
+    }
+
+    function loadSettings() {
+      chrome.storage.local.get([
+        'customApiBaseUrl', 'customApiKey', 'customModel', 'customModels'
+      ], function(items) {
+        apiBaseUrl.value = items.customApiBaseUrl || DEFAULTS.customApiBaseUrl;
+        apiKey.value = items.customApiKey || DEFAULTS.customApiKey;
+        defaultModel.value = items.customModel || DEFAULTS.customModel;
+        if (items.customModels && Array.isArray(items.customModels)) {
+          customModels.value = items.customModels.join('\n');
+        } else {
+          customModels.value = DEFAULTS.customModels.join('\n');
+        }
+      });
+    }
+
+    function getStorageSize(callback) {
+      var count = 0;
+      chrome.storage.local.getBytesInUse(null, function(bytes) {
+        callback(bytes);
+      });
+    }
+
+    function showStorageInfo() {
+      getStorageSize(function(bytes) {
+        storageInfo.textContent = 'Storage used: ' + (bytes / 1024).toFixed(1) + ' KB';
+      });
+    }
+
+    saveBtn.addEventListener('click', function() {
+      var url = apiBaseUrl.value.trim();
+      if (!url) {
+        showMsg('API Base URL is required', 'error');
+        return;
+      }
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        showMsg('API Base URL must start with http:// or https://', 'error');
+        return;
+      }
+
+      var models = customModels.value
+        .split('\n')
+        .map(function(m) { return m.trim(); })
+        .filter(function(m) { return m.length > 0; });
+
+      var data = {
+        customApiBaseUrl: url.replace(/\/$/, ''),
+        customApiKey: apiKey.value.trim(),
+        customModel: defaultModel.value.trim() || DEFAULTS.customModel,
+        customModels: models
+      };
+
+      chrome.storage.local.set(data, function() {
+        if (chrome.runtime.lastError) {
+          showMsg('Error: ' + chrome.runtime.lastError.message, 'error');
+        } else {
+          showMsg('Settings saved successfully! Reload the extension sidepanel to apply.', 'success');
+          showStorageInfo();
+        }
+      });
+    });
+
+    resetBtn.addEventListener('click', function() {
+      chrome.storage.local.set({
+        customApiBaseUrl: DEFAULTS.customApiBaseUrl,
+        customApiKey: '',
+        customModel: DEFAULTS.customModel,
+        customModels: DEFAULTS.customModels
+      }, function() {
+        loadSettings();
+        showMsg('Settings reset to defaults', 'success');
+      });
+    });
+
+    openSidepanel.addEventListener('click', function() {
+      chrome.sidePanel.open({ path: '/sidepanel.html' }, function() {
+        if (chrome.runtime.lastError) {
+          chrome.tabs.create({ url: '/sidepanel.html' });
+        }
+      });
+    });
+
+    loadSettings();
+    showStorageInfo();
+  </script>
+</body>
+</html>

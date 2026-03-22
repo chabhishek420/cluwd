@@ -91,8 +91,30 @@
   })
 })()
 
-const cfcBase =
-  "http://139.59.5.16:8317/" || "http://localhost:8787/" || ""
+// Read custom API URL from storage (set by settings.html)
+var _cachedCfcBase = null;
+function getCfcBase() {
+  if (_cachedCfcBase) return _cachedCfcBase;
+  var stored = null;
+  try {
+    var keys = {};
+    // Sync read from localStorage as fallback
+    var lsVal = localStorage.getItem('cfcBase');
+    if (lsVal) stored = lsVal;
+  } catch(e) {}
+  _cachedCfcBase = stored || "http://139.59.5.16:8317/";
+  return _cachedCfcBase;
+}
+// Async cache population
+if (typeof chrome !== 'undefined' && chrome.storage) {
+  chrome.storage.local.get(['customApiBaseUrl'], function(result) {
+    if (result.customApiBaseUrl) {
+      _cachedCfcBase = result.customApiBaseUrl.replace(/\/$/, '') + '/';
+    }
+  });
+}
+
+var cfcBase = getCfcBase();
 
 // Inject comprehensive fake state to bypass authentication and onboarding
 // Use a STABLE fake token (don't use Date.now() - causes re-renders!)
@@ -308,7 +330,7 @@ if (!globalThis.__cfc_options) {
     mode: "",
     cfcBase: cfcBase,
     anthropicBaseUrl: "",
-    apiBaseIncludes: ["http://139.59.5.16:8317/v1/"],
+    apiBaseIncludes: [cfcBase.replace(/\/$/, '') + "/v1/", "http://139.59.5.16:8317/v1/"],
     proxyIncludes: [
       "cdn.segment.com",
       "featureassets.org",
@@ -353,7 +375,7 @@ export async function getOptions(force = false) {
       options.mode = ""
       options.cfcBase = cfcBase
       options.anthropicBaseUrl = ""
-      options.apiBaseIncludes = ["http://139.59.5.16:8317/v1/"]
+      options.apiBaseIncludes = [cfcBase.replace(/\/$/, '') + "/v1/", "http://139.59.5.16:8317/v1/"]
       options.proxyIncludes = options.proxyIncludes
       options.discardIncludes = options.discardIncludes
       options.modelAlias = {}

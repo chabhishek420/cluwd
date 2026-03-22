@@ -20,5 +20,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Redirect to settings.html after React loads, or show a fallback link
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          document.body.innerHTML = '<div style="padding:32px;font-family:sans-serif;color:#e5e5e5;background:#0f0f0f;min-height:100vh"><h1 style="color:#fff;margin-bottom:16px">Claude Extension Settings</h1><p style="color:#999;margin-bottom:24px">Configure your custom API endpoint.</p><a href="/settings.html" style="display:inline-block;padding:12px 24px;background:#7c5cff;color:#fff;text-decoration:none;border-radius:8px;font-weight:500">Open Settings</a></div>';
+        }
+      }, 1500);
+    </script>
   </body>
 </html>

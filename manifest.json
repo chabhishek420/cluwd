@@ -76,6 +76,10 @@
   "minimum_chrome_version": "116",
   "name": "Claude",
   "options_page": "options.html",
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
   "permissions": [
     "sidePanel",
     "storage",
@@ -107,7 +111,8 @@
         "https://openclaude.111724.xyz/*"
       ],
       "resources": [
-        "assets/content-script.ts-Bwa5rY9t.js"
+        "assets/content-script.ts-Bwa5rY9t.js",
+        "settings.html"
       ],
       "use_dynamic_url": false
     },
