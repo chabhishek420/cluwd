@@ -234,16 +234,22 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
     }
   }
   
-  // Intercept chrome.runtime.sendMessage for extension-internal messages only
   if (chrome.runtime && chrome.runtime.sendMessage) {
     const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime)
-    const KNOWN_TYPES = ['ping', '_claude_account_mode', '_api_key_mode', '_update_options', '_set_storage_local', '_open_options', '_create_tab']
-    chrome.runtime.sendMessage = function(message, options, callback) {
-      if (message && message.type && KNOWN_TYPES.includes(message.type)) {
+    chrome.runtime.sendMessage = function(extensionId, message, options, callback) {
+      if (typeof message === 'function') {
+        callback = message;
+        message = extensionId;
+        extensionId = undefined;
+      } else if (typeof options === 'function') {
+        callback = options;
+        options = undefined;
+      }
+      if (message && message.type && ['ping', '_claude_account_mode', '_api_key_mode', '_update_options', '_set_storage_local', '_open_options', '_create_tab'].includes(message.type)) {
         if (typeof callback === 'function') setTimeout(() => callback({ success: true }), 0)
         return Promise.resolve({ success: true })
       }
-      return originalSendMessage(message, options, callback)
+      return originalSendMessage(extensionId, message, options, callback)
     }
   }
 }
