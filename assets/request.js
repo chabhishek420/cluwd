@@ -1,75 +1,3 @@
-// ============================================================
-// CRITICAL: Patch React's setState FIRST, before React loads
-// This prevents infinite update loops (React error #185)
-// ============================================================
-;(function() {
-  const MAX_UPDATES_PER_TICK = 10
-  const UPDATE_WINDOW_MS = 100
-  const updateCounts = new Map()
-
-  function patchReactSetState() {
-    // Wait for React to define its internal functions, then patch
-    const tryPatch = () => {
-      // React 18+ patches these internal functions
-      const targets = [
-        [globalThis, 'Dr'],
-        [globalThis, 'Ir'],
-        [globalThis, 'fi'],
-        [globalThis, 'di'],
-      ]
-      
-      let patched = false
-      for (const [obj, name] of targets) {
-        if (obj && typeof obj[name] === 'function' && !obj['__' + name + '_patched']) {
-          const original = obj[name]
-          obj[name] = function(...args) {
-            const now = Date.now()
-            const key = name + '_' + (now - (now % UPDATE_WINDOW_MS))
-            const count = (updateCounts.get(key) || 0) + 1
-            updateCounts.set(key, count)
-            
-            // If too many updates in this window, stop them
-            if (count > MAX_UPDATES_PER_TICK) {
-              // console.log('[request.js] React update blocked (loop detected):', name, 'count:', count)
-              return
-            }
-            return original.apply(this, args)
-          }
-          obj['__' + name + '_patched'] = true
-          patched = true
-        }
-      }
-      
-      // Also patch __reactRenderCount if it exists
-      if (globalThis.__reactRenderCount !== undefined) {
-        globalThis.__reactRenderCount = Math.min(globalThis.__reactRenderCount, MAX_UPDATES_PER_TICK)
-      }
-      
-      return patched
-    }
-    
-    // Try immediately and then retry a few times
-    let attempts = 0
-    const interval = setInterval(() => {
-      if (tryPatch() || attempts++ > 20) {
-        clearInterval(interval)
-      }
-    }, 50)
-  }
-  
-  // Also override Promise rejection handling to suppress React errors
-  if (typeof window !== 'undefined') {
-    window.addEventListener('unhandledrejection', function(e) {
-      const msg = e.reason?.message || String(e.reason) || ''
-      if (msg.includes('185') || msg.includes('Minified React')) {
-        e.preventDefault()
-        e.stopPropagation()
-      }
-    })
-  }
-  
-  patchReactSetState()
-})()
 
 // Read custom API URL from storage (set by settings.html)
 var _cachedCfcBase = null;
@@ -177,33 +105,30 @@ const fakeTokenData = {
   "user-settings": JSON.stringify({
     theme: "dark",
     model: "claude-3-sonnet-20240229"
-  }),
-  __reactRenderCount: 5
+  })
 }
 
 if (typeof chrome !== 'undefined' && chrome.storage) {
-  chrome.storage.local.set(fakeTokenData)
+  chrome.storage.local.get(['accessToken'], function(existing) {
+    if (!existing.accessToken) {
+      chrome.storage.local.set(fakeTokenData)
+    }
+  })
   globalThis.__fakeTokens = fakeTokenData
   globalThis.__fakeToken = fakeToken
-  globalThis.__reactRenderCount = 0
-  
-  // Patch chrome.storage.onChanged to prevent change-detection loops
+
   if (chrome.storage && chrome.storage.onChanged) {
-    chrome.storage.onChanged.addListener = (function(original) {
-      return function(listener, ...args) {
-        const wrappedListener = function(changes, areaName) {
-          try {
-            // Rate-limit storage change notifications
-            const now = Date.now()
-            if (!globalThis.__lastStorageChange || now - globalThis.__lastStorageChange > 50) {
-              globalThis.__lastStorageChange = now
-              return listener(changes, areaName)
-            }
-          } catch(e) {}
+    const origAddListener = chrome.storage.onChanged.addListener.bind(chrome.storage.onChanged)
+    chrome.storage.onChanged.addListener = function(listener, ...args) {
+      const wrapped = function(changes, areaName) {
+        const now = Date.now()
+        if (!globalThis.__lastStorageChange || now - globalThis.__lastStorageChange > 50) {
+          globalThis.__lastStorageChange = now
+          return listener(changes, areaName)
         }
-        return original.call(chrome.storage.onChanged, wrappedListener, ...args)
       }
-    })(chrome.storage.onChanged.addListener.bind(chrome.storage.onChanged))
+      return origAddListener(wrapped, ...args)
+    }
   }
   
   // Intercept chrome.tabs.get to return a fake tab and prevent errors
@@ -254,15 +179,21 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
   }
 }
 
-// Global error handler to prevent silent crashes
+// Global error handler
 if (typeof window !== 'undefined') {
   window.onerror = function(msg, url, line, col, error) {
-    console.log('[request.js] Global error:', msg, 'at', url, ':', line, ':', col, error)
+    console.log('[request.js] Error:', msg, 'at', url, ':', line)
     return false
   }
-  window.onunhandledrejection = function(event) {
-    console.log('[request.js] Unhandled rejection:', event.reason)
-  }
+  window.addEventListener('unhandledrejection', function(event) {
+    const msg = event.reason && (event.reason.message || String(event.reason)) || ''
+    if (msg.indexOf('185') !== -1 || msg.indexOf('Minified React') !== -1 || msg.indexOf('Max update') !== -1) {
+      event.preventDefault()
+      event.stopPropagation()
+    } else {
+      console.log('[request.js] Unhandled rejection:', event.reason)
+    }
+  })
 }
 
 // Redirect options page to our options.html instead of blocking
